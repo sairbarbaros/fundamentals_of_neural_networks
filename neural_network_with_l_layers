@@ -1,0 +1,233 @@
+import numpy as np
+from dnn_utils import sigmoid, sigmoid_backward, relu, relu_backward
+from public_tests import *
+
+#Firstly, we are going to define our functions
+
+def initializing_deep(layer_dimensions):
+    """
+
+    :param layer_dimensions: size of the dimensions of the layers as an array
+    :return: shape of the weight and bias matrices as dictionary (parameters)
+    """
+
+    parameters = {}
+    l = len(layer_dimensions)
+
+    for l in range(1, l):
+
+        parameters['W' + str(l)].shape = np.random.randn(layer_dimensions[l], layer_dimensions[l-1]) * 0.01
+        parameters['b' + str(l)].shape = np.zeros((layer_dimensions[l], 1))
+
+    return parameters
+
+#forward functions
+def forward_once(A, W, b):
+    """
+
+    :param A: A from previous layer as an array
+    :param W: weight matrix
+    :param b: bias matrix
+    :return: Z(pre-activation parameter), cache(containing A, W, b)
+    """
+
+    Z = np.dot(W, A) + b
+
+    cache = (A, W, b)
+
+    return Z, cache
+
+def forward_activation(A_prev, W, b, activation):
+    """
+
+    :param A_prev: A of the previous layer as an array
+    :param W: weight matrix
+    :param b: bias matrix
+    :param activation: activation function
+    :return: A(A of this layer) and cache containing linear and activation cache for backprop
+    """
+
+    if activation == "sigmoid":
+        Z, linear_cache = forward_once(A_prev, W, b)
+        A, activation_cache = sigmoid(Z)
+
+    elif activation == "relu":
+        Z, linear_cache = forward_once(A_prev, W, b)
+        A, activation_cache = sigmoid(Z)
+
+    cache = (linear_cache, activation_cache)
+
+    return A, cache
+
+def forward_model(X, parameters):
+    """
+
+    :param X: input data as an array
+    :param parameters: output of initialization
+    :return: AL(A of the last layer), cache(of all)
+    """
+
+    caches = []
+    A = X
+    L = len(parameters) // 2
+
+    for l in range(1, L):
+        A_prev = A
+        A, cache = forward_activation(A, parameters['W' + str(L)], parameters['b' + str(L)], activation="relu")
+        caches.append(cache)
+
+    AL, cache = forward_activation(A, parameters['W' + str(L)], parameters['b' + str(L)], activation="sigmoid")
+    caches.append(cache)
+
+    return AL, caches
+
+def computing_cost(AL, Y):
+    """
+
+    :param AL: Y-hat or probabilities
+    :param Y: true labels
+    :return: cost(cross-entropy cost)
+    """
+
+    m = Y.shape[1]
+    cost = (-1 / m) * (np.dot(Y, np.log(AL).T) + np.dot((1 - Y), np.log(1 - AL).T))
+
+    return cost
+
+#backward functions
+def backward_once(dZ, cache):
+    """
+
+    :param dZ: gradient of the output
+    :param cache: containing A, W, b
+    :return: dA_prev, dW, db (gradients of those)
+    """
+
+    A_prev, W, b = cache
+    m = A_prev.shape[1]
+
+    dW = (1 / m) * np.dot(dZ, A_prev.T)
+    db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
+    dA_prev = np.dot(W.T, dZ)
+
+    return dA_prev, dW, db
+
+def backward_activation(dA, cache, activation):
+    """
+
+    :param dA: post-activation gradient as an array
+    :param cache: tuple of linear_cache and activation_cache
+    :param activation: type of the function
+    :return: dA_prev, dW, db (gradients of those)
+    """
+
+    linear_cache, activation_cache = cache
+
+    if activation == "relu":
+
+        dZ = relu_backward(dA, activation_cache)
+        dA_prev, dW, db = backward_once(dZ, linear_cache)
+
+    elif activation == "sigmoid":
+
+        dZ = sigmoid_backward(dA, activation_cache)
+        dA_prev, dW, db = linear_backward(dZ, linear_cache)
+
+    return dA_prev, dW, db
+
+def backward_model(AL, Y, caches):
+    """
+
+    :param AL: Y-hat or probabilities
+    :param Y: true label vector
+    :param caches: every cache of relu and sigmoid based functions
+    :return: gradients
+    """
+
+    grads = {}
+    L = len(caches)
+    m = AL.shape[1]
+    Y = Y.reshape[AL.shape]
+
+    dAL = -(np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
+
+    current_cache = caches[L - 1]
+    grads["dA" + str(L - 1)], grads["dW" + str(L)], grads["db" + str(L)] = backward_once(dAL, current_cache, activation="sigmoid")
+
+    for l in reversed(range(L-1)):
+
+        current_cache = caches[l]
+        dA_prev_temp, dW_temp, db_temp = backward_activation(grads["dA" + str(l + 1)], current_cache, activation="relu")
+        grads["dA" + str(l)] = dA_prev_temp
+        grads["dW" + str(l + 1)] = dW_temp
+        grads["db" + str(l + 1)] = db_temp
+
+    return grads
+
+#parameter updating function
+
+def update_parameters(params, grads, learning_rate):
+    """
+
+    :param params: copy of parameters as a dictionary
+    :param grads: gradients as a dictionary
+    :param learning_rate: learning rate as float
+    :return: updated parameters
+    """
+
+    parameters = params.copy()
+    L = len(parameters) // 2
+
+    for l in range(L):
+
+        parameters["W" + str(l + 1)] = parameters["W" + str(l + 1)] - learning_rate * grads["dW" + str(l + 1)]
+        parameters["b" + str(l + 1)] = parameters["b" + str(l + 1)] - learning_rate * grads["db" + str(l + 1)]
+
+    return parameters
+
+#load your data in a way you want (ex. from tensorflow or excel)
+train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
+
+m_train = train_x_orig.shape[0]
+num_px = train_x_orig.shape[1]
+m_test = test_x_orig.shape[0]
+
+train_x_flatten = train_x_orig.reshape(train_x_orig.shape[0], -1).T
+test_x_flatten = test_x_orig.reshape(test_x_orig.shape[0], -1).T
+
+train_x = train_x_flatten/255.
+test_x = test_x_flatten/255.
+# we have successfully standardized our parameters
+
+layer_dimensions = [12288, 25, 8, 4, 1]
+
+def deep_neural_model(X, Y, layers_dimensions, learning_rate = 0.0050, num_iterations = 1000, print_cost=True):
+    """
+
+    :param X: input array
+    :param Y: true label array
+    :param layers_dimensions: dimensions of the layers as an array
+    :param learning_rate: learning rate constant as a float
+    :param num_iterations: number of iterations as an integer
+    :param print_cost: shall the code print the cost? boolean
+    :return: parameters learnt
+    """
+
+    costs = []
+    parameters = initializing_deep(layer_dimensions)
+
+    for i in range(0, num_iterations):
+
+        AL, caches = forward_model(X, parameters)
+        cost = computing_cost(AL, Y)
+        grads = backward_model(AL, Y, caches)
+        parameters = update_parameters(parameters, grads, learning_rate)
+
+        if print_cost and i % 100 == 0 or i == num_iterations - 1:
+            print("Cost after iteration {}: {}".format(i, np.squeeze(cost)))
+        if i % 100 == 0 or i == num_iterations:
+            costs.append(cost)
+    return parameters, costs
+
+parameters, costs = deep_neural_model(train_x, train_y, layers_dimensions=layer_dimensions, num_iterations = 2500, print_cost = True)
+

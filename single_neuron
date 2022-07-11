@@ -1,0 +1,105 @@
+import numpy as np
+import copy
+#import your dataset via tensorflow, pytorch or similar libraries
+
+# Firstly we load our data
+
+train_x, train_y, test_x, test_y = # Load your data using your preferred library's instructions. Pay attention to loading binary classifiable datasets. 
+
+# Secondly we flatten and standardize, standardization is due to the limited RGB range, our data
+
+flat_train_x = train_x.reshape(train_x.shape[0], -1).T
+flat_test_x = test_x.reshape(test_x.shape[0], -1).T
+
+standard_train_x = flat_train_x / 255
+standard_test_x = flat_test_x / 255
+
+# We must define our model structure, initialize, and loop. We completed the first part.
+
+# To build our model, we must define our functions at first. Let's define them.
+
+
+def initialization(num_of_params):
+
+    w = np.zeros((num_of_params, 1))
+    b = 0.0
+
+    return w, b
+
+
+def sigmoid(z):
+
+    sigmo = 1 / (1 + np.exp(-z))
+
+    return sigmo
+
+# Our parameters are initialized, and our sigmoid classification function is defined.
+# Now it is time to define forward and backward propagation and related functions.
+
+
+def propagation(w, b, x_vector, y_vector):
+
+    m = x_vector.shape[0]
+
+    a_vector = sigmoid(np.dot(w.T, x_vector) + b)
+    cost = np.sum(((-np.log(a_vector)) * y_vector + (-np.log(1-a_vector)) * (1-y_vector))) / m
+
+    dw = (np.dot(x_vector, (a_vector - y_vector).T)) / m
+    db = (np.sum(a_vector - y_vector)) / m
+
+    return cost, dw, db
+
+
+def optimization(w, b, x_vector, y_vector, iterations, learning_rate):
+
+    w = copy.deepcopy(w)
+    b = copy.deepcopy(b)
+
+    costs = []
+
+    for i in range(iterations):
+        cost, dw, db = propagation(w, b, x_vector, y_vector)
+        w = w - (learning_rate * dw)
+        b = b - (learning_rate * db)
+
+        if i % 50 == 0:
+            costs.append(cost)
+            print(cost)
+
+    return w, b, dw, db, costs
+
+
+def prediction(w, b, x_vector):
+
+    m = x_vector.shape[1]
+    y_hat = np.zeros((1, m))
+    w = w.reshape(x_vector[0], 1)
+
+    a_vector = sigmoid(np.dot(w.T, x_vector) + b)
+
+    for i in range(a_vector.shape[1]):
+
+        y_hat = (a_vector >= 0.5) * 1.0
+
+    return y_hat
+
+# Now let's put all of these into a model. Building models helps us to write our code clearer.
+
+
+def neural_model(x_train, y_train, x_test, y_test, iterations, learning_rate):
+
+    w, b = initialization(x_train.shape[0])
+    w, b, dw, db, costs = optimization(w, b, x_train, y_train, iterations, learning_rate)
+    y_hat_train = prediction(w, b, x_train)
+    y_hat_test = prediction(w, b, x_test)
+
+    print("train accuracy: {} %".format(100 - np.mean(np.abs(y_hat_train - y_train)) * 100))
+    print("test accuracy: {} %".format(100 - np.mean(np.abs(y_hat_test - y_test)) * 100))
+
+    return costs, w, b, y_hat_train, y_hat_test, learning_rate, iterations
+
+# Finally we built our model. Now we can try it on our previously loaded dataset.
+
+
+model_testing = neural_model(standard_train_x, train_y, standard_test_x, test_y,
+                             iterations=1000, learning_rate=0.5)
